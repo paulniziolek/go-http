@@ -24,7 +24,7 @@ type Request struct {
 	Proto      string
 	ProtoMajor int
 	ProtoMinor int
-	Headers    map[string][]string
+	Headers    Headers
 	// TODO: Convert Body to an `io.Reader`.
 	Body string
 
@@ -81,7 +81,7 @@ func (req *Request) ParseRequest(data []byte) (int, bool, error) {
 			if end == -1 {
 				return consumed, done, nil
 			}
-			requestLine := data[consumed:end]
+			requestLine := data[:end]
 			consumed += end + len(CRLF)
 			if err := parseRequestLine(req, requestLine); err != nil {
 				return consumed, done, err
@@ -103,6 +103,7 @@ func (req *Request) ParseRequest(data []byte) (int, bool, error) {
 			}
 			consumed += idx + len(CRLF)
 		case stateBody:
+			// TODO: for "Transfer-Encoding: chunked", support reading a chunked body.
 			// TODO: parse body based on header's "Content-Length"
 			req.Body = string(data[consumed:])
 			req.state = stateDone
@@ -111,7 +112,6 @@ func (req *Request) ParseRequest(data []byte) (int, bool, error) {
 			return consumed, done, nil
 		}
 	}
-
 }
 
 func parseRequestLine(req *Request, line []byte) error {
@@ -169,11 +169,11 @@ func parseFieldLine(req *Request, line []byte) error {
 	if len(rawName) == 0 {
 		return ErrMalformedHeaderLine
 	}
-	// TODO: Canonicalize header field name per RFC standards.
-	fieldName := strings.ToLower(string(rawName))
+	fieldName := string(rawName)
 	// TODO: Check if we need to validate the value in any way.
 	fieldValue := strings.Trim(string(rawValue), " ")
-	req.Headers[fieldName] = append(req.Headers[fieldName], fieldValue)
+	req.Headers.Add(fieldName, fieldValue)
+
 	return nil
 }
 
