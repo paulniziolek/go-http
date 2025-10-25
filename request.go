@@ -112,8 +112,10 @@ func (req *Request) ParseRequest(data []byte) (int, bool, error) {
 				if err != nil {
 					return consumed, done, ErrInvalidContentLength
 				}
-				// TODO: Handle cases with incomplete body.
 				// TODO: Handle cases with bigger body than specified.
+				if len(data)-consumed+1 > contentLength {
+					return consumed, done, nil
+				}
 				req.Body = string(data[consumed : consumed+contentLength])
 				consumed += contentLength
 			}
