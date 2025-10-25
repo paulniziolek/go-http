@@ -5,17 +5,20 @@ import (
 	"errors"
 	"io"
 	"log/slog"
+	"strconv"
 	"strings"
 )
 
 var (
 	CRLF = []byte("\r\n")
 
-	ErrMalformedRequest    = errors.New("malformed request")
-	ErrInvalidHTTPVersion  = errors.New("invalid http version")
-	ErrInvalidMethod       = errors.New("invalid http method")
-	ErrUnsupportedMethod   = errors.New("http method not yet supported")
-	ErrMalformedHeaderLine = errors.New("field/header line is malformed")
+	ErrMalformedRequest     = errors.New("malformed request")
+	ErrInvalidHTTPVersion   = errors.New("invalid http version")
+	ErrInvalidMethod        = errors.New("invalid http method")
+	ErrUnsupportedMethod    = errors.New("http method not yet supported")
+	ErrMalformedHeaderLine  = errors.New("field/header line is malformed")
+	ErrInvalidContentLength = errors.New("invalid content-length")
+	ErrUnsupportedEncoding  = errors.New("unsupported transfer-encoding")
 )
 
 type Request struct {
@@ -103,9 +106,24 @@ func (req *Request) ParseRequest(data []byte) (int, bool, error) {
 			}
 			consumed += idx + len(CRLF)
 		case stateBody:
-			// TODO: for "Transfer-Encoding: chunked", support reading a chunked body.
-			// TODO: parse body based on header's "Content-Length"
-			req.Body = string(data[consumed:])
+			contentLengthValue, ok := req.Headers.Get("content-length")
+			if ok {
+				contentLength, err := strconv.Atoi(contentLengthValue)
+				if err != nil {
+					return consumed, done, ErrInvalidContentLength
+				}
+				// TODO: Handle cases with incomplete body.
+				// TODO: Handle cases with bigger body than specified.
+				req.Body = string(data[consumed : contentLength+1])
+				consumed += contentLength
+			}
+
+			_, ok = req.Headers.Get("transfer-encoding")
+			if ok {
+				// TODO: for "Transfer-Encoding: chunked", support reading a chunked body.
+				return consumed, done, ErrUnsupportedEncoding
+			}
+
 			req.state = stateDone
 		case stateDone:
 			done = true

@@ -5,11 +5,11 @@ import "strings"
 type Headers map[string][]string
 
 // Get returns the first value of a key, and an empty string for no values.
-func (h Headers) Get(key string) string {
+func (h Headers) Get(key string) (string, bool) {
 	if len(h[canonical(key)]) == 0 {
-		return ""
+		return "", false
 	}
-	return h[canonical(key)][0]
+	return h[canonical(key)][0], true
 }
 
 // Add adds the key-value pair to the header.
