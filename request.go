@@ -12,9 +12,9 @@ import (
 var (
 	CRLF = []byte("\r\n")
 
-	ErrMalformedRequest     = errors.New("malformed request")
+	ErrMalformedRequestLine = errors.New("malformed request line")
 	ErrInvalidHTTPVersion   = errors.New("invalid http version")
-	ErrInvalidMethod        = errors.New("invalid http method")
+	ErrInvalidMethod        = errors.New("invalid method")
 	ErrUnsupportedMethod    = errors.New("http method not yet supported")
 	ErrMalformedHeaderLine  = errors.New("field/header line is malformed")
 	ErrInvalidContentLength = errors.New("invalid content-length")
@@ -114,7 +114,7 @@ func (req *Request) ParseRequest(data []byte) (int, bool, error) {
 				}
 				// TODO: Handle cases with incomplete body.
 				// TODO: Handle cases with bigger body than specified.
-				req.Body = string(data[consumed : contentLength+1])
+				req.Body = string(data[consumed : consumed+contentLength])
 				consumed += contentLength
 			}
 
@@ -136,7 +136,7 @@ func parseRequestLine(req *Request, line []byte) error {
 	method, rest, ok := bytes.Cut(line, []byte(" "))
 	target, proto, ok2 := bytes.Cut(rest, []byte(" "))
 	if !ok || !ok2 {
-		return ErrMalformedRequest
+		return ErrMalformedRequestLine
 	}
 
 	req.Method = string(method)
