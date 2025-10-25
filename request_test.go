@@ -55,16 +55,23 @@ func TestParseRequest(t *testing.T) {
 			ok:          false,
 			expectedErr: ErrMalformedHeaderLine,
 		},
+		{
+			input: "POST /resource HTTP/1.1\r\nContent-Length: 9000\r\n\r\nHello",
+			ok:    false,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.input, func(t *testing.T) {
 			req := NewRequest()
 			_, done, err := req.ParseRequest([]byte(tt.input))
+			if tt.expectedErr == nil && err != nil {
+				t.Fatalf("expected no error but received error: %v", err)
+			}
+			if !errors.Is(err, tt.expectedErr) {
+				t.Fatalf("expected error: %v, but got: %v", tt.expectedErr, err)
+			}
 			if tt.ok != done {
 				t.Fatalf("expected ok: %t but got: %t", tt.ok, done)
-			}
-			if !errors.Is(tt.expectedErr, err) {
-				t.Fatalf("expected error: %v, but got: %v", tt.expectedErr, err)
 			}
 		})
 	}

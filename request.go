@@ -53,6 +53,7 @@ func Parse(conn io.Reader) (*Request, error) {
 	read := 0
 	consumed := 0
 
+	// TODO: Add buffer compaction and limit header sizing.
 	for {
 		n, err := conn.Read(buf[read:])
 		if err != nil {
@@ -113,7 +114,7 @@ func (req *Request) ParseRequest(data []byte) (int, bool, error) {
 					return consumed, done, ErrInvalidContentLength
 				}
 				// TODO: Handle cases with bigger body than specified.
-				if len(data)-consumed+1 > contentLength {
+				if len(data)-consumed < contentLength {
 					return consumed, done, nil
 				}
 				req.Body = string(data[consumed : consumed+contentLength])
@@ -191,7 +192,7 @@ func parseFieldLine(req *Request, line []byte) error {
 	}
 	fieldName := string(rawName)
 	// TODO: Check if we need to validate the value in any way.
-	fieldValue := strings.Trim(string(rawValue), " ")
+	fieldValue := strings.TrimSpace(string(rawValue))
 	req.Headers.Add(fieldName, fieldValue)
 
 	return nil

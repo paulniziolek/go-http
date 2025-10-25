@@ -3,6 +3,11 @@ package main
 import (
 	"log/slog"
 	"net"
+	"time"
+)
+
+const (
+	defaultReadTimeout = 500 * time.Millisecond
 )
 
 type Server struct {
@@ -38,6 +43,8 @@ func (s *Server) ListenAndServe() error {
 
 func handleConn(conn net.Conn) {
 	defer conn.Close()
+	// TODO: Use configs to set HTTP timeouts
+	conn.SetReadDeadline(time.Now().Add(defaultReadTimeout))
 	req, err := Parse(conn)
 	if err != nil {
 		slog.Error("[handleConn] ParseRequest failed", slog.Any("err", err))
