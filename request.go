@@ -22,12 +22,13 @@ var (
 )
 
 type Request struct {
-	Method     string
-	Target     string
-	Proto      string
-	ProtoMajor int
-	ProtoMinor int
-	Headers    Headers
+	Method        string
+	Target        string
+	Proto         string
+	ProtoMajor    int
+	ProtoMinor    int
+	Headers       Headers
+	ContentLength int
 	// TODO: Convert Body to an `io.Reader`.
 	Body string
 
@@ -76,34 +77,36 @@ func Parse(conn io.Reader) (*Request, error) {
 // ParseRequest returns consumedBytes, isDone, err
 func (req *Request) ParseRequest(data []byte) (int, bool, error) {
 	consumed := 0
-	done := false
 
 	for {
 		switch req.state {
 		case stateRequestLine:
 			end := bytes.Index(data, CRLF)
 			if end == -1 {
-				return consumed, done, nil
+				return consumed, false, nil
 			}
 			requestLine := data[:end]
 			consumed += end + len(CRLF)
 			if err := parseRequestLine(req, requestLine); err != nil {
-				return consumed, done, err
+				return consumed, false, err
 			}
 			req.state = stateFieldLines
 		case stateFieldLines:
 			idx := bytes.Index(data[consumed:], CRLF)
 			if idx == -1 {
-				return consumed, done, nil
+				return consumed, false, nil
 			}
 			if idx == 0 {
+				if err := req.applyHeaderSemantics(); err != nil {
+					return consumed, false, err
+				}
 				req.state = stateBody
 				consumed += len(CRLF)
 				continue
 			}
 			fieldLine := data[consumed : consumed+idx]
 			if err := parseFieldLine(req, fieldLine); err != nil {
-				return consumed, done, err
+				return consumed, false, err
 			}
 			consumed += idx + len(CRLF)
 		case stateBody:
@@ -111,11 +114,11 @@ func (req *Request) ParseRequest(data []byte) (int, bool, error) {
 			if ok {
 				contentLength, err := strconv.Atoi(contentLengthValue)
 				if err != nil {
-					return consumed, done, ErrInvalidContentLength
+					return consumed, false, ErrInvalidContentLength
 				}
 				// TODO: Handle cases with bigger body than specified.
 				if len(data)-consumed < contentLength {
-					return consumed, done, nil
+					return consumed, false, nil
 				}
 				req.Body = string(data[consumed : consumed+contentLength])
 				consumed += contentLength
@@ -124,15 +127,28 @@ func (req *Request) ParseRequest(data []byte) (int, bool, error) {
 			_, ok = req.Headers.Get("transfer-encoding")
 			if ok {
 				// TODO: for "Transfer-Encoding: chunked", support reading a chunked body.
-				return consumed, done, ErrUnsupportedEncoding
+				return consumed, false, ErrUnsupportedEncoding
 			}
 
 			req.state = stateDone
 		case stateDone:
-			done = true
-			return consumed, done, nil
+			return consumed, true, nil
 		}
 	}
+}
+
+// applyHeaderSemantics processes all header field lines.
+func (req *Request) applyHeaderSemantics() error {
+	// TODO: Content-Length can appear multiple times with the same value,
+	// so we need to enforce that it's the same for all appearances.
+	if contentLength, ok := req.Headers.Get("content-length"); ok {
+		n, err := strconv.Atoi(contentLength)
+		if err != nil {
+			return ErrInvalidContentLength
+		}
+		req.ContentLength = n
+	}
+	return nil
 }
 
 func parseRequestLine(req *Request, line []byte) error {
