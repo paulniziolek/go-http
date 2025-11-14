@@ -23,7 +23,8 @@ type Server struct {
 
 func NewServer(address string) *Server {
 	return &Server{
-		Addr: address,
+		Addr:   address,
+		Router: make(map[string]Handler),
 	}
 }
 
