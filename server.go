@@ -10,8 +10,15 @@ const (
 	defaultReadTimeout = 500 * time.Millisecond
 )
 
+// Handler provides the interface to process a request via `ServeHTTP`.
+// This definition is inspired from the net/http package.
+type Handler interface {
+	ServeHTTP(w ResponseWriter, r *Request)
+}
+
 type Server struct {
-	Addr string
+	Addr   string
+	Router map[string]Handler
 }
 
 func NewServer(address string) *Server {
