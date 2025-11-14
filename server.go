@@ -44,13 +44,14 @@ func (s *Server) ListenAndServe() error {
 			slog.Error("connection refused", slog.Any("err", err))
 			continue
 		}
-		go handleConn(conn)
+		go s.handleConn(conn)
 	}
 }
 
-func handleConn(conn net.Conn) {
+func (s *Server) handleConn(conn net.Conn) {
 	defer conn.Close()
 	// TODO: Use configs to set HTTP timeouts
+	// TODO: Process HTTP requests in a loop until reached Closed request/response.
 	conn.SetReadDeadline(time.Now().Add(defaultReadTimeout))
 	req, err := Parse(conn)
 	if err != nil {
@@ -58,5 +59,20 @@ func handleConn(conn net.Conn) {
 		return
 	}
 	slog.Info("Received Request", slog.Any("request", req))
+	// TODO: ServeHTTP should use default writers based on the HTTP protocol.
+	// Currently, only HTTP/1.1 is supported so that is the defaulted protocol.
+	w := &http1ResponseWriter{
+		req:  req,
+		conn: conn,
+	}
 
+	handler, ok := s.Router[req.Target]
+	if !ok {
+		// The requested target resource doesn't exist.
+		slog.Error("Requested target resource is not found", slog.String("target", req.Target))
+		w.WriteHeader(StatusNotFound)
+		return
+	}
+
+	handler.ServeHTTP(w, req)
 }
