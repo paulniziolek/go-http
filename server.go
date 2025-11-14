@@ -16,6 +16,12 @@ type Handler interface {
 	ServeHTTP(w ResponseWriter, r *Request)
 }
 
+type HandlerFunc func(ResponseWriter, *Request)
+
+func (f HandlerFunc) ServeHTTP(w ResponseWriter, r *Request) {
+	f(w, r)
+}
+
 type Server struct {
 	Addr   string
 	Router map[string]Handler
@@ -34,6 +40,10 @@ func (s *Server) Handle(pattern string, handler Handler) {
 		return
 	}
 	s.Router[pattern] = handler
+}
+
+func (s *Server) HandleFunc(pattern string, handler func(ResponseWriter, *Request)) {
+	s.Handle(pattern, HandlerFunc(handler))
 }
 
 func (s *Server) ListenAndServe() error {
