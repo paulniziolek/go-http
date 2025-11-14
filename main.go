@@ -23,7 +23,14 @@ func (h *helloWorldHandler) ServeHTTP(w ResponseWriter, req *Request) {
 
 func main() {
 	server := NewServer(":42069")
+	// Example usage with hello world handler
 	helloHandler := NewHelloWorldHandler()
+	// Example usage with shorthand handler function
+	server.HandleFunc("/hi", func(w ResponseWriter, r *Request) {
+		response := "hi!"
+		w.Header().Set("Content-Length", strconv.Itoa(len(response)))
+		w.Write([]byte(response))
+	})
 	server.Handle("/", helloHandler)
 	server.ListenAndServe()
 
