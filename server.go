@@ -71,8 +71,9 @@ func (s *Server) handleConn(conn net.Conn) {
 	// TODO: ServeHTTP should use default writers based on the HTTP protocol.
 	// Currently, only HTTP/1.1 is supported so that is the defaulted protocol.
 	w := &http1ResponseWriter{
-		req:  req,
-		conn: conn,
+		req:    req,
+		conn:   conn,
+		header: make(map[string][]string),
 	}
 
 	handler, ok := s.Router[req.Target]
