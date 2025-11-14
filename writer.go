@@ -1,5 +1,17 @@
 package main
 
+import (
+	"errors"
+	"fmt"
+	"log/slog"
+	"net"
+	"strconv"
+)
+
+var (
+	ErrWriteOverflow = errors.New("attempted to write more than content-length specified")
+)
+
 // The ResponseWriter is inspired from the net/http package.
 type ResponseWriter interface {
 	// Header() returns the Headers map of the Response. Headers are written
@@ -15,3 +27,67 @@ type ResponseWriter interface {
 	Write([]byte) (int, error)
 }
 
+// http1ResponseWriter is the default ResponseWriter for HTTP/1.1.
+type http1ResponseWriter struct {
+	req    *Request
+	header Headers
+	conn   net.Conn // or io.Writer?
+
+	contentLength int
+	status        string
+	wroteHeader   bool
+	wrote         int
+}
+
+func (w *http1ResponseWriter) Header() Headers {
+	return w.header
+}
+
+func (w *http1ResponseWriter) WriteHeader(code int) {
+	status, ok := codeToStatusMap[code]
+	if !ok {
+		slog.Error("[WriteHeader] Invalid or unsupported HTTP code", slog.Int("code", code))
+		return
+	}
+	if w.wroteHeader {
+		slog.Error("[WriteHeader] Header has already been written")
+		return
+	}
+	if cl, ok := w.header.Get("Content-Length"); ok {
+		parsedCL, err := strconv.Atoi(cl)
+		if err != nil {
+			slog.Error("[WriteHeader] Invalid Content-Length set", slog.String("content-length", cl))
+			return
+		}
+		w.contentLength = parsedCL
+	}
+
+	w.status = status
+	w.conn.Write([]byte(fmt.Sprintf("HTTP/1.1 %s", w.status)))
+	w.conn.Write(CRLF)
+
+	w.header.ForEach(func(key string, value string) {
+		w.conn.Write([]byte(fmt.Sprintf("%s: %s ", key, value)))
+		w.conn.Write(CRLF)
+	})
+	w.conn.Write(CRLF)
+	w.wroteHeader = true
+}
+
+func (w *http1ResponseWriter) Write(b []byte) (int, error) {
+	// TODO: Support writing in chunked mode.
+	if !w.wroteHeader {
+		w.WriteHeader(StatusOK)
+	}
+	remaining := w.contentLength - w.wrote
+	if len(b) > remaining {
+		slog.Error("[Write] Attempted to write more than specified Content-Length")
+		return 0, ErrWriteOverflow
+	}
+	n, err := w.conn.Write(b)
+	if err != nil {
+		return n, err
+	}
+	w.wrote += n
+	return n, nil
+}
