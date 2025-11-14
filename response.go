@@ -19,13 +19,15 @@ type Response struct {
 }
 
 const (
-	StatusOK         = 200
-	StatusBadRequest = 400
-	StatusNotFound   = 404
+	StatusOK               = 200
+	StatusBadRequest       = 400
+	StatusNotFound         = 404
+	StatusMethodNotAllowed = 405
 )
 
 var codeToStatusMap = map[int]string{
-	StatusOK:         "200 OK",
-	StatusBadRequest: "400 Bad Request",
-	StatusNotFound:   "404 Not Found",
+	StatusOK:               "200 OK",
+	StatusBadRequest:       "400 Bad Request",
+	StatusNotFound:         "404 Not Found",
+	StatusMethodNotAllowed: "405 Method Not Allowed",
 }
