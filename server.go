@@ -27,6 +27,14 @@ func NewServer(address string) *Server {
 	}
 }
 
+func (s *Server) Handle(pattern string, handler Handler) {
+	if _, ok := s.Router[pattern]; ok {
+		slog.Error("[Handle] Handler for pattern already defined", slog.String("pattern", pattern))
+		return
+	}
+	s.Router[pattern] = handler
+}
+
 func (s *Server) ListenAndServe() error {
 	var addr = s.Addr
 	if addr == "" {
