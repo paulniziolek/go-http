@@ -18,8 +18,14 @@ type Response struct {
 	ContentLength int
 }
 
+const (
+	StatusOK         = 200
+	StatusBadRequest = 400
+	StatusNotFound   = 404
+)
+
 var codeToStatusMap = map[int]string{
-	200: "200 OK",
-	400: "400 Bad Request",
-	404: "404 Not Found",
+	StatusOK:         "200 OK",
+	StatusBadRequest: "400 Bad Request",
+	StatusNotFound:   "404 Not Found",
 }
