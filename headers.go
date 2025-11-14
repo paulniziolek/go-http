@@ -19,6 +19,11 @@ func (h Headers) GetAll(key string) []string {
 	return h[canonical(key)]
 }
 
+// Set overwrites the current key-value pair with the single value provided.
+func (h Headers) Set(key string, value string) {
+	h[canonical(key)] = []string{value}
+}
+
 // Add adds the key-value pair to the header.
 func (h Headers) Add(key string, value string) {
 	h[canonical(key)] = append(h[canonical(key)], value)
