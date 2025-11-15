@@ -117,8 +117,6 @@ func (s *Server) handleConn(conn net.Conn) {
 func shouldClose(req *Request, respHdr Headers) bool {
 	reqHdr := req.Headers
 	if req.Proto == "HTTP/1.0" {
-		// TODO: The server should choose to echo back the keep-alive when
-		// serving the response, but we don't.
 		return !reqHdr.ContainsValue("Connection", "keep-alive")
 	}
 

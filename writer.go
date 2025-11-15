@@ -61,9 +61,21 @@ func (w *http1ResponseWriter) WriteHeader(code int) {
 		}
 		w.contentLength = parsedCL
 	}
+	proto := "HTTP/1.1"
+	if w.req != nil && w.req.Proto != "" {
+		proto = w.req.Proto
+	}
+
+	if proto == "HTTP/1.0" {
+		if w.req != nil && w.req.Headers.ContainsValue("Connection", "keep-alive") {
+			w.Header().Set("Connection", "keep-alive")
+		} else {
+			w.Header().Set("Connection", "close")
+		}
+	}
 
 	w.status = status
-	w.writer.Write([]byte(fmt.Sprintf("HTTP/1.1 %s", w.status)))
+	fmt.Fprintf(w.writer, "%s %s", proto, w.status)
 	w.writer.Write(CRLF)
 
 	w.header.ForEach(func(key string, value string) {
