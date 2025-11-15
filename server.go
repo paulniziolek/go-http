@@ -69,30 +69,62 @@ func (s *Server) ListenAndServe() error {
 
 func (s *Server) handleConn(conn net.Conn) {
 	defer conn.Close()
-	// TODO: Use configs to set HTTP timeouts
-	// TODO: Process HTTP requests in a loop until reached Closed request/response.
-	conn.SetReadDeadline(time.Now().Add(defaultReadTimeout))
-	req, err := Parse(conn)
-	if err != nil {
-		slog.Error("[handleConn] ParseRequest failed", slog.Any("err", err))
-		return
+	for {
+		// TODO: Use configs to set HTTP timeouts
+		conn.SetReadDeadline(time.Now().Add(defaultReadTimeout))
+
+		req, err := Parse(conn)
+		w := &http1ResponseWriter{
+			req:    req,
+			writer: conn,
+			header: make(map[string][]string),
+		}
+		if err != nil {
+			slog.Error("[handleConn] ParseRequest failed", slog.Any("err", err))
+			// TODO: Need to verify if we can send "Bad Request" for any parser error.
+			// TODO: If err is timeout, we send a 408 and close the connection.
+			// TODO: If client closes the connection via `io.EOF`, then we just close.
+
+			w.Header().Set("Connection", "close")
+			w.WriteHeader(StatusBadRequest)
+			return
+		}
+		slog.Info("Received Request", slog.Any("request", req))
+
+		// TODO: ServeHTTP should use default writers based on the HTTP protocol.
+		// Currently, only HTTP/1.1 is supported so that is the defaulted protocol.
+
+		handler, ok := s.Router[req.Target]
+		if !ok {
+			slog.Error("Requested target resource is not found", slog.String("target", req.Target))
+			w.WriteHeader(StatusNotFound)
+			continue
+		}
+
+		handler.ServeHTTP(w, req)
+
+		// TODO: If the message body isn't fully read, the unread contents can
+		// flow into the next request sent by the connection.
+		// Thus, we need to flush the contents... before sending a response? or
+		// right after sending a response?
+
+		if shouldClose(req, w.Header()) {
+			return
+		}
 	}
-	slog.Info("Received Request", slog.Any("request", req))
-	// TODO: ServeHTTP should use default writers based on the HTTP protocol.
-	// Currently, only HTTP/1.1 is supported so that is the defaulted protocol.
-	w := &http1ResponseWriter{
-		req:    req,
-		writer: conn,
-		header: make(map[string][]string),
+}
+
+func shouldClose(req *Request, respHdr Headers) bool {
+	reqHdr := req.Headers
+	if req.Proto == "HTTP/1.0" {
+		// TODO: The server should choose to echo back the keep-alive when
+		// serving the response, but we don't.
+		return !reqHdr.ContainsValue("Connection", "keep-alive")
 	}
 
-	handler, ok := s.Router[req.Target]
-	if !ok {
-		// The requested target resource doesn't exist.
-		slog.Error("Requested target resource is not found", slog.String("target", req.Target))
-		w.WriteHeader(StatusNotFound)
-		return
+	if reqHdr.ContainsValue("Connection", "close") || respHdr.ContainsValue("Connection", "close") {
+		return true
 	}
 
-	handler.ServeHTTP(w, req)
+	return false
 }
