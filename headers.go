@@ -30,6 +30,12 @@ func (h Headers) Add(key string, value string) {
 	h[canonical(key)] = append(h[canonical(key)], value)
 }
 
+// ContainsKey returns true if a key is defined in the Headers.
+func (h Headers) ContainsKey(key string) bool {
+	_, ok := h[canonical(key)]
+	return ok
+}
+
 // ContainsValue returns true if a specific key-value pair is contained by the Headers.
 func (h Headers) ContainsValue(key string, value string) bool {
 	return slices.Contains(h[canonical(key)], value)
