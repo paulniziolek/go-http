@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"errors"
 	"testing"
 )
@@ -75,4 +76,19 @@ func TestParseRequest(t *testing.T) {
 			}
 		})
 	}
+}
+
+func FuzzParse(f *testing.F) {
+	seeds := [][]byte{
+		[]byte("GET /resource HTTP/1.1\r\n\r\n"),
+		[]byte("POST /resource HTTP/1.1\r\nContent-Length: 5\r\n\r\nHello"),
+	}
+	for _, seed := range seeds {
+		f.Add(seed)
+	}
+
+	f.Fuzz(func(t *testing.T, data []byte) {
+		r := bytes.NewReader(data)
+		_, _ = Parse(r)
+	})
 }
