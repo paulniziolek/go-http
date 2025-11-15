@@ -5,7 +5,9 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"net/http"
 	"strconv"
+	"time"
 )
 
 var (
@@ -33,10 +35,12 @@ type http1ResponseWriter struct {
 	header Headers
 	writer io.Writer
 
-	contentLength int
-	status        string
-	wroteHeader   bool
-	wrote         int
+	contentLength    int
+	hasContentLength bool
+	status           string
+	wroteHeader      bool
+	wrote            int
+	chunked          bool
 }
 
 func (w *http1ResponseWriter) Header() Headers {
@@ -53,13 +57,20 @@ func (w *http1ResponseWriter) WriteHeader(code int) {
 		slog.Error("[WriteHeader] Header has already been written")
 		return
 	}
+	if code >= 100 && code < 200 || code == 204 || code == 304 {
+		// By HTTP Semantics, we must refuse a body in these responses.
+		w.Header().Set("Content-Length", "0")
+	}
+
 	if cl, ok := w.header.Get("Content-Length"); ok {
+		// TODO: Enforce all values to be the same.
 		parsedCL, err := strconv.Atoi(cl)
 		if err != nil {
 			slog.Error("[WriteHeader] Invalid Content-Length set", slog.String("content-length", cl))
 			return
 		}
 		w.contentLength = parsedCL
+		w.hasContentLength = true
 	}
 	proto := "HTTP/1.1"
 	if w.req != nil && w.req.Proto != "" {
@@ -74,12 +85,24 @@ func (w *http1ResponseWriter) WriteHeader(code int) {
 		}
 	}
 
+	if !w.header.ContainsKey("Date") {
+		w.header.Set("Date", time.Now().UTC().Format(http.TimeFormat))
+	}
+
+	// For HTTP/1.1 requests without any set Content-Length, we must default
+	// response bodies to chunked encoding.
+	if proto == "HTTP/1.1" && !w.hasContentLength && !w.Header().ContainsValue("Transfer-Encoding", "chunked") {
+		w.Header().Add("Transfer-Encoding", "chunked")
+	}
+
+	w.chunked = w.Header().ContainsValue("Transfer-Encoding", "chunked")
+
 	w.status = status
 	fmt.Fprintf(w.writer, "%s %s", proto, w.status)
 	w.writer.Write(CRLF)
 
 	w.header.ForEach(func(key string, value string) {
-		w.writer.Write([]byte(fmt.Sprintf("%s: %s ", key, value)))
+		w.writer.Write([]byte(fmt.Sprintf("%s: %s", key, value)))
 		w.writer.Write(CRLF)
 	})
 	w.writer.Write(CRLF)
