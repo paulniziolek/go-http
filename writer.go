@@ -3,8 +3,8 @@ package main
 import (
 	"errors"
 	"fmt"
+	"io"
 	"log/slog"
-	"net"
 	"strconv"
 )
 
@@ -31,7 +31,7 @@ type ResponseWriter interface {
 type http1ResponseWriter struct {
 	req    *Request
 	header Headers
-	conn   net.Conn // or io.Writer?
+	writer io.Writer
 
 	contentLength int
 	status        string
@@ -63,14 +63,14 @@ func (w *http1ResponseWriter) WriteHeader(code int) {
 	}
 
 	w.status = status
-	w.conn.Write([]byte(fmt.Sprintf("HTTP/1.1 %s", w.status)))
-	w.conn.Write(CRLF)
+	w.writer.Write([]byte(fmt.Sprintf("HTTP/1.1 %s", w.status)))
+	w.writer.Write(CRLF)
 
 	w.header.ForEach(func(key string, value string) {
-		w.conn.Write([]byte(fmt.Sprintf("%s: %s ", key, value)))
-		w.conn.Write(CRLF)
+		w.writer.Write([]byte(fmt.Sprintf("%s: %s ", key, value)))
+		w.writer.Write(CRLF)
 	})
-	w.conn.Write(CRLF)
+	w.writer.Write(CRLF)
 	w.wroteHeader = true
 }
 
@@ -84,7 +84,7 @@ func (w *http1ResponseWriter) Write(b []byte) (int, error) {
 		slog.Error("[Write] Attempted to write more than specified Content-Length")
 		return 0, ErrWriteOverflow
 	}
-	n, err := w.conn.Write(b)
+	n, err := w.writer.Write(b)
 	if err != nil {
 		return n, err
 	}

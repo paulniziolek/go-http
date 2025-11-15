@@ -82,7 +82,7 @@ func (s *Server) handleConn(conn net.Conn) {
 	// Currently, only HTTP/1.1 is supported so that is the defaulted protocol.
 	w := &http1ResponseWriter{
 		req:    req,
-		conn:   conn,
+		writer: conn,
 		header: make(map[string][]string),
 	}
 
