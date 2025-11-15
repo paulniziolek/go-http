@@ -1,6 +1,7 @@
 package main
 
 import (
+	"slices"
 	"strings"
 )
 
@@ -27,6 +28,11 @@ func (h Headers) Set(key string, value string) {
 // Add adds the key-value pair to the header.
 func (h Headers) Add(key string, value string) {
 	h[canonical(key)] = append(h[canonical(key)], value)
+}
+
+// ContainsValue returns true if a specific key-value pair is contained by the Headers.
+func (h Headers) ContainsValue(key string, value string) bool {
+	return slices.Contains(h[canonical(key)], value)
 }
 
 // ForEach iterates over all (key, value) pairs, including duplicates.
