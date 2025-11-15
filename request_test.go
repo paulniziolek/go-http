@@ -60,6 +60,11 @@ func TestParseRequest(t *testing.T) {
 			input: "POST /resource HTTP/1.1\r\nContent-Length: 9000\r\n\r\nHello",
 			ok:    false,
 		},
+		{
+			input:       "GET / HTTP/1.0\r\nTransfer-Encoding: chunked\r\n\r\n",
+			ok:          false,
+			expectedErr: ErrUnsupportedEncoding,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.input, func(t *testing.T) {

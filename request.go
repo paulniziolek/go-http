@@ -141,13 +141,23 @@ func (req *Request) ParseRequest(data []byte) (int, bool, error) {
 func (req *Request) applyHeaderSemantics() error {
 	// TODO: Content-Length can appear multiple times with the same value,
 	// so we need to enforce that it's the same for all appearances.
-	if contentLength, ok := req.Headers.Get("content-length"); ok {
+	if contentLength, ok := req.Headers.Get("Content-Length"); ok {
 		n, err := strconv.Atoi(contentLength)
 		if err != nil {
 			return ErrInvalidContentLength
 		}
 		req.ContentLength = n
 	}
+
+	if _, ok := req.Headers.Get("Transfer-Encoding"); ok && req.Proto == "HTTP/1.0" {
+		// Transfer-Encoding must be rejected for HTTP/1.0
+		// TODO: Server would need to close the connection after this.
+		return ErrUnsupportedEncoding
+	}
+
+	// TODO: If "chunk" encoding is not the final Transfer Encoding, server
+	// must respond with a 400 Bad Request and close the connection.
+
 	return nil
 }
 
